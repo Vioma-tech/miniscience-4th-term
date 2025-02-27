@@ -7,6 +7,7 @@ add_executable(cube cube.cpp)
 add_executable(circle circle.cpp)
 add_executable(cylinder cylinder.cpp)
 add_executable(donut donut.cpp)
+add_executable(plane plane.cpp)
 
 
 #include_directories(${GMSH_INCLUDE_DIR})
@@ -23,3 +24,4 @@ target_link_libraries(cube ${GMSH_LIBRARIES})
 target_link_libraries(circle ${GMSH_LIBRARIES})
 target_link_libraries(cylinder ${GMSH_LIBRARIES})
 target_link_libraries(donut ${GMSH_LIBRARIES})
+target_link_libraries(plane ${GMSH_LIBRARIES})
