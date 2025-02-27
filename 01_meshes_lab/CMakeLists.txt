@@ -5,6 +5,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -g")
 project(gmshdemo)
 add_executable(cube cube.cpp)
 add_executable(circle circle.cpp)
+add_executable(cylinder cylinder.cpp)
 
 # --- Подключаем gmsh, тут придется перебирать варианты 
 
@@ -29,3 +30,4 @@ set(GMSH_LIBRARIES gmsh)
 # Укажем библиотеки для линковки
 target_link_libraries(cube ${GMSH_LIBRARIES})
 target_link_libraries(circle ${GMSH_LIBRARIES})
+target_link_libraries(cylinder ${GMSH_LIBRARIES})
