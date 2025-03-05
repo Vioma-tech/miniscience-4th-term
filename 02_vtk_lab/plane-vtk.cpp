@@ -26,7 +26,7 @@ protected:
     double y;
     double z;
     // Некая величина, в попугаях
-    double smth;
+    double scalar_field;
     // Скорость
     double vx;
     double vy;
@@ -34,13 +34,13 @@ protected:
 
 public:
     // Конструктор по умолчанию
-    CalcNode() : x(0.0), y(0.0), z(0.0), smth(0.0), vx(0.0), vy(0.0), vz(0.0)
+    CalcNode() : x(0.0), y(0.0), z(0.0), scalar_field(0.0), vx(0.0), vy(0.0), vz(0.0)
     {
     }
 
     // Конструктор с указанием всех параметров
-    CalcNode(double x, double y, double z, double smth, double vx, double vy, double vz) 
-            : x(x), y(y), z(z), smth(smth), vx(vx), vy(vy), vz(vz)
+    CalcNode(double x, double y, double z, double scalar_field, double vx, double vy, double vz) 
+            : x(x), y(y), z(z), scalar_field(scalar_field), vx(vx), vy(vy), vz(vz)
     {
     }
 
@@ -84,10 +84,10 @@ public:
             double pointX = nodesCoords[i*3];
             double pointY = nodesCoords[i*3 + 1];
             double pointZ = nodesCoords[i*3 + 2];
-            // Модельная скалярная величина распределена как-то вот так
-            double smth = pow(pointX, 2) + pow(pointY, 2) + pow(pointZ, 2);
-            nodes[i] = CalcNode(pointX, pointY, pointZ, smth, 0.0, 0.0, 0.0);
+            nodes[i] = CalcNode(pointX, pointY, pointZ, 0.0, 0.0, 0.0, 0.0);
         }
+
+        CalcScalarField(0);
 
         // Пройдём по элементам в модели gmsh
         elements.resize(tetrsPoints.size() / 4);
@@ -99,12 +99,25 @@ public:
         }
     }
 
+    void CalcScalarField(double t) {
+        double A = 10;
+        double lambda = 10, k = lambda / (2 * M_PI);
+        double omega = 2 * M_PI / 10;
+        for(unsigned int i = 0; i < nodes.size(); i++) {
+            double scalar_field = A * sin(omega * t - k * nodes[i].x + k * nodes[i].y);
+            nodes[i].scalar_field = scalar_field;
+        }
+    }
+
     // Метод отвечает за выполнение для всей сетки шага по времени величиной tau
-    void doTimeStep(double tau) {
+    void doTimeStep(double tau, unsigned int step) {
         // По сути метод просто двигает все точки
         for(unsigned int i = 0; i < nodes.size(); i++) {
             nodes[i].move(tau);
         }
+
+        double t = tau * step;
+        CalcScalarField(t);
     }
 
     // Метод отвечает за запись текущего состояния сетки в снапшот в формате VTK
@@ -115,8 +128,8 @@ public:
         vtkSmartPointer<vtkPoints> dumpPoints = vtkSmartPointer<vtkPoints>::New();
 
         // Скалярное поле на точках сетки
-        auto smth = vtkSmartPointer<vtkDoubleArray>::New();
-        smth->SetName("smth");
+        auto scalar_field = vtkSmartPointer<vtkDoubleArray>::New();
+        scalar_field->SetName("s_field");
 
         // Векторное поле на точках сетки
         auto vel = vtkSmartPointer<vtkDoubleArray>::New();
@@ -133,7 +146,7 @@ public:
             vel->InsertNextTuple(_vel);
 
             // И значение скалярного поля тоже
-            smth->InsertNextValue(nodes[i].smth);
+            scalar_field->InsertNextValue(nodes[i].scalar_field);
         }
 
         // Грузим точки в сетку
@@ -141,7 +154,7 @@ public:
 
         // Присоединяем векторное и скалярное поля к точкам
         unstructuredGrid->GetPointData()->AddArray(vel);
-        unstructuredGrid->GetPointData()->AddArray(smth);
+        unstructuredGrid->GetPointData()->AddArray(scalar_field);
 
         // А теперь пишем, как наши точки объединены в тетраэдры
         for(unsigned int i = 0; i < elements.size(); i++) {
@@ -154,7 +167,8 @@ public:
         }
 
         // Создаём снапшот в файле с заданным именем
-        string fileName = "plane-vtk-step-" + std::to_string(snap_number) + ".vtu";
+        cout << snap_number << " snap in process..." << "\n";
+        string fileName = "plane-vtk-output/plane-vtk-step-" + std::to_string(snap_number) + ".vtu";
         vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
         writer->SetFileName(fileName.c_str());
         writer->SetInputData(unstructuredGrid);
@@ -164,10 +178,8 @@ public:
 
 int main()
 {
-    // Шаг точек по пространству
-    double h = 4.0;
     // Шаг по времени
-    double tau = 0.01;
+    double tau = 1;
 
     const unsigned int GMSH_TETR_CODE = 4;
 
@@ -188,7 +200,7 @@ int main()
 
     // Восстановим геометрию как в лабе 01_meshes
     double angle = 10;
-    bool forceParametrizablePatches = false;
+    bool forceParametrizablePatches = true;
     bool includeBoundary = true;
     double curveAngle = 180;
     gmsh::model::mesh::classifySurfaces(angle * M_PI / 180., includeBoundary, forceParametrizablePatches, curveAngle * M_PI / 180.);
@@ -206,7 +218,7 @@ int main()
 
     // Зададим мелкость желаемой сетки
     int f = gmsh::model::mesh::field::add("MathEval");
-    gmsh::model::mesh::field::setString(f, "F", "4");
+    gmsh::model::mesh::field::setString(f, "F", "0.7");
     gmsh::model::mesh::field::setAsBackgroundMesh(f);
 
     // Построим сетку
@@ -249,10 +261,18 @@ int main()
     // TODO: неплохо бы полноценно данные сетки проверять, да
 
     CalcMesh mesh(nodesCoord, *tetrsNodesTags);
+    
 
     gmsh::finalize();
 
     mesh.snapshot(0);
+
+    // Делаем шаги по времени, 
+    // на каждом шаге считаем новое состояние и пишем его в VTK
+    for(unsigned int step = 1; step < 10; step++) {
+        mesh.doTimeStep(tau, step);
+        mesh.snapshot(step);
+    }
 
     return 0;
 }
