@@ -5,7 +5,7 @@
 # Require CMake 3.5
 cmake_minimum_required(VERSION 3.5)
 
-set(PROJECT_NAME demo_poisson)
+set(PROJECT_NAME poisson_rect)
 project(${PROJECT_NAME})
 
 # Set CMake behavior
