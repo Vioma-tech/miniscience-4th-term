@@ -88,6 +88,7 @@ public:
         }
 
         CalcScalarField(0);
+        CalcVelocityField(0);
 
         // Пройдём по элементам в модели gmsh
         elements.resize(tetrsPoints.size() / 4);
@@ -99,25 +100,44 @@ public:
         }
     }
 
+    // вычисляем некоторое скалярное поле
     void CalcScalarField(double t) {
         double A = 10;
-        double lambda = 10, k = lambda / (2 * M_PI);
-        double omega = 2 * M_PI / 10;
+        double lambda = 10, k = 2 * M_PI / lambda;
+        double omega = 2 * M_PI / 5;
         for(unsigned int i = 0; i < nodes.size(); i++) {
             double scalar_field = A * sin(omega * t - k * nodes[i].x + k * nodes[i].y);
             nodes[i].scalar_field = scalar_field;
         }
     }
 
+    // вычисляем некоторое поле скоростей
+    void CalcVelocityField(double t) {
+        double A = 3;
+        double A_tail = 2;
+        double lambda = 80 * 4, k = 2 * M_PI / lambda;
+        double omega = 2 * M_PI / 5;
+        double omega_tail = 2 * M_PI / 1;
+        for(unsigned int i = 0; i < nodes.size(); i++) {
+            if (nodes[i].x > 80)
+                nodes[i].vz = A * omega * cos(omega * t) * sin(k * (nodes[i].x - 80));
+            else if (nodes[i].x < 24)
+                nodes[i].vz = -A * omega* cos(omega * t) * sin(k * (nodes[i].x - 24));
+            if (nodes[i].y > 30)
+                nodes[i].vx = A_tail * omega_tail * cos(omega_tail * t) * sin(k * (nodes[i].y - 30));
+        }
+    }
+
     // Метод отвечает за выполнение для всей сетки шага по времени величиной tau
     void doTimeStep(double tau, unsigned int step) {
-        // По сути метод просто двигает все точки
+        double t = tau * step;
+        CalcScalarField(t);
+        CalcVelocityField(t);
+
+        // двигаем все точки
         for(unsigned int i = 0; i < nodes.size(); i++) {
             nodes[i].move(tau);
         }
-
-        double t = tau * step;
-        CalcScalarField(t);
     }
 
     // Метод отвечает за запись текущего состояния сетки в снапшот в формате VTK
@@ -179,7 +199,7 @@ public:
 int main()
 {
     // Шаг по времени
-    double tau = 1;
+    double tau = 0.1;
 
     const unsigned int GMSH_TETR_CODE = 4;
 
@@ -258,7 +278,6 @@ int main()
     // И ещё проверим, что в тетраэдрах что-то похожее на правду лежит.
     assert(tetrsNodesTags->size() % 4 == 0);
 
-    // TODO: неплохо бы полноценно данные сетки проверять, да
 
     CalcMesh mesh(nodesCoord, *tetrsNodesTags);
     
@@ -269,7 +288,7 @@ int main()
 
     // Делаем шаги по времени, 
     // на каждом шаге считаем новое состояние и пишем его в VTK
-    for(unsigned int step = 1; step < 10; step++) {
+    for(unsigned int step = 1; step < 100; step++) {
         mesh.doTimeStep(tau, step);
         mesh.snapshot(step);
     }
